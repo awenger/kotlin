@@ -6,46 +6,75 @@
 package org.jetbrains.kotlin.fir.builder
 
 import com.intellij.psi.PsiElement
-import org.jetbrains.kotlin.fir.FirSession
-import org.jetbrains.kotlin.fir.containingClass
-import org.jetbrains.kotlin.fir.containingClassAttr
-import org.jetbrains.kotlin.fir.declarations.FirCallableMemberDeclaration
-import org.jetbrains.kotlin.fir.declarations.FirDeclaration
-import org.jetbrains.kotlin.fir.declarations.FirRegularClass
-import org.jetbrains.kotlin.fir.declarations.isInner
-import org.jetbrains.kotlin.fir.psi
+import org.jetbrains.kotlin.fir.*
+import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.builder.FirClassBuilder
 import org.jetbrains.kotlin.fir.scopes.FirScopeProvider
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
 import org.jetbrains.kotlin.psi.*
 
-class RawFirFragmentForLazyBodiesBuilder private constructor(
+class RawFirFragmentForLazyBodiesBuilder<T : KtElement> private constructor(
     session: FirSession,
     baseScopeProvider: FirScopeProvider,
-    private val declaration: KtDeclaration,
+    private val rootNonLocalDeclaration: KtDeclaration,
+    private val replacement: Pair<T, T>? = null
 ) : RawFirBuilder(session, baseScopeProvider, RawFirBuilderMode.NORMAL) {
 
     companion object {
+        fun <T : KtElement> buildWithReplacement(
+            session: FirSession,
+            baseScopeProvider: FirScopeProvider,
+            designation: List<FirDeclaration>,
+            rootNonLocalDeclaration: KtDeclaration,
+            replacement: Pair<T, T>? = null
+        ): FirDeclaration {
+            if (replacement != null) {
+                require(replacement.first::class == replacement.second::class) {
+                    "Build with replacement is possible for same type in replacements but given\n${replacement::class.simpleName} and ${replacement.second::class.simpleName}"
+                }
+            }
+            val builder = RawFirFragmentForLazyBodiesBuilder(session, baseScopeProvider, rootNonLocalDeclaration, replacement)
+            builder.context.packageFqName = rootNonLocalDeclaration.containingKtFile.packageFqName
+            return builder.moveNext(designation.iterator())
+        }
+
         fun build(
             session: FirSession,
             baseScopeProvider: FirScopeProvider,
             designation: List<FirDeclaration>,
-            declaration: KtDeclaration,
+            rootNonLocalDeclaration: KtDeclaration
         ): FirDeclaration {
-            val builder = RawFirFragmentForLazyBodiesBuilder(session, baseScopeProvider, declaration)
-            builder.context.packageFqName = declaration.containingKtFile.packageFqName
+            val builder = RawFirFragmentForLazyBodiesBuilder<KtElement>(session, baseScopeProvider, rootNonLocalDeclaration)
+            builder.context.packageFqName = rootNonLocalDeclaration.containingKtFile.packageFqName
             return builder.moveNext(designation.iterator())
         }
     }
 
     private fun moveNext(iterator: Iterator<FirDeclaration>): FirDeclaration {
         if (!iterator.hasNext()) {
-            return if (declaration is KtProperty) {
-                with(Visitor()) {
-                    declaration.toFirProperty(null)
+            val visitor = object : Visitor() {
+                public override fun onConvert(element: KtElement): FirElement? =
+                    super.onConvert(
+                        if (replacement != null && replacement.first == element) replacement.second else element
+                    )
+
+                public override fun onConvertProperty(ktProperty: KtProperty, ownerClassBuilder: FirClassBuilder?): FirProperty {
+                    if (replacement == null || replacement.first != ktProperty)
+                        return super.onConvertProperty(ktProperty, ownerClassBuilder)
+
+                    val second = replacement.second
+                    check(second is KtProperty)
+                    return super.onConvertProperty(second, ownerClassBuilder)
                 }
-            } else {
-                declaration.accept(Visitor(), Unit) as FirDeclaration
             }
+
+            //TODO Replace with convert
+            return if (rootNonLocalDeclaration is KtProperty) {
+                //TODO Non Top Level properties does not accepts correctly because of passing null instead of correct OwnerClassBuilder
+                visitor.onConvertProperty(rootNonLocalDeclaration, null)
+            } else {
+                visitor.onConvert(rootNonLocalDeclaration)
+            } as FirDeclaration
         }
 
         val parent = iterator.next()

@@ -66,9 +66,4 @@ abstract class FirModuleResolveState {
     internal abstract fun <D : FirDeclaration> resolvedFirToPhase(declaration: D, toPhase: FirResolvePhase): D
 
     internal abstract fun getFirFile(declaration: FirDeclaration, cache: ModuleFileCache): FirFile?
-
-    abstract fun getTowerDataContextForElement(element: KtElement): FirTowerDataContext?
 }
-
-fun FirModuleResolveState.getTowerDataContextUnsafe(element: KtElement): FirTowerDataContext =
-    getTowerDataContextForElement(element) ?: error("No context for ${element.getElementTextInContext()}")

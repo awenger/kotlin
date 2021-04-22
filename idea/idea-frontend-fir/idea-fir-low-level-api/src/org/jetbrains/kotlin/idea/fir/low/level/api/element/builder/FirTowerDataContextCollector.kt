@@ -6,7 +6,7 @@
 package org.jetbrains.kotlin.idea.fir.low.level.api.element.builder
 
 import com.intellij.psi.PsiElement
-import org.jetbrains.kotlin.fir.ThreadSafeMutableState
+import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.expressions.FirStatement
@@ -15,43 +15,57 @@ import org.jetbrains.kotlin.fir.resolve.FirTowerDataContext
 import org.jetbrains.kotlin.idea.fir.low.level.api.util.originalDeclaration
 import org.jetbrains.kotlin.psi.*
 
-@ThreadSafeMutableState
-class FirTowerDataContextCollector {
-    private val state: MutableMap<KtElement, FirTowerDataContext> = hashMapOf()
-
-    fun addFileContext(file: FirFile, context: FirTowerDataContext) {
-        val ktFile = file.psi as? KtFile ?: return
-        state[ktFile] = context
-    }
-
-    fun addStatementContext(statement: FirStatement, context: FirTowerDataContext) {
-        val closestStatementInBlock = statement.psi?.closestBlockLevelOrInitializerExpression() ?: return
-        state[closestStatementInBlock] = context
-    }
-
-    fun addDeclarationContext(declaration: FirDeclaration, context: FirTowerDataContext) {
-        (declaration.psi as? KtElement)?.let { state[it] = context }
-    }
-
-    fun getContext(psi: KtElement): FirTowerDataContext? = state[psi]
+interface FirTowerContextProvider {
+    fun getClosestAvailableParentContext(ktElement: KtElement): FirTowerDataContext?
 }
 
-fun FirTowerDataContextCollector.getClosestAvailableParentContext(element: KtElement): FirTowerDataContext? {
-    var current: PsiElement? = element
-    while (current != null) {
-        if (current is KtElement) {
-            getContext(current)?.let { return it }
-        }
-        if (current is KtDeclaration) {
-            val originalDeclaration = current.originalDeclaration
-            originalDeclaration?.let { getContext(it) }?.let { return it }
-        }
-        if (current is KtFile) {
-            break
-        }
-        current = current.parent
+interface FirTowerDataContextCollector {
+    fun addFileContext(file: FirFile, context: FirTowerDataContext)
+    fun addStatementContext(statement: FirStatement, context: FirTowerDataContext)
+    fun addDeclarationContext(declaration: FirDeclaration, context: FirTowerDataContext)
+}
+
+class FirTowerDataContextInsideElementCollector(val targetElement: KtElement) : FirTowerDataContextCollector, FirTowerContextProvider {
+    private val state: MutableMap<KtElement, FirTowerDataContext> = hashMapOf()
+
+    override fun addFileContext(file: FirFile, context: FirTowerDataContext) {
+        val ktFile = file.psi as? KtFile ?: return
+        tryPut(ktFile, context)
     }
-    return null
+
+    override fun addStatementContext(statement: FirStatement, context: FirTowerDataContext) {
+        val closestStatementInBlock = statement.psi?.closestBlockLevelOrInitializerExpression() ?: return
+        tryPut(closestStatementInBlock, context)
+    }
+
+    override fun addDeclarationContext(declaration: FirDeclaration, context: FirTowerDataContext) {
+        val psi = declaration.psi as? KtElement ?: return
+        tryPut(psi, context)
+    }
+
+    private fun tryPut(psi: KtElement, context: FirTowerDataContext) {
+        if (PsiTreeUtil.isAncestor(targetElement, psi, true)) {
+            state[psi] = context
+        }
+    }
+
+    override fun getClosestAvailableParentContext(ktElement: KtElement): FirTowerDataContext? {
+        var current: PsiElement? = ktElement
+        while (current != null) {
+            if (current is KtElement) {
+                state[current]?.let { return it }
+            }
+            if (current is KtDeclaration) {
+                val originalDeclaration = current.originalDeclaration
+                originalDeclaration?.let { state[it] }?.let { return it }
+            }
+            if (current is KtFile) {
+                break
+            }
+            current = current.parent
+        }
+        return null
+    }
 }
 
 private tailrec fun PsiElement.closestBlockLevelOrInitializerExpression(): KtExpression? =

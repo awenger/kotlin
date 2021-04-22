@@ -13,45 +13,51 @@ import org.jetbrains.kotlin.fir.declarations.builder.*
 import org.jetbrains.kotlin.fir.expressions.FirReturnExpression
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
 import org.jetbrains.kotlin.idea.fir.low.level.api.providers.firIdeProvider
+import org.jetbrains.kotlin.idea.util.getElementTextInContext
 import org.jetbrains.kotlin.psi.*
 
 object DeclarationCopyBuilder {
-    fun createDeclarationCopy(
-        originalFirDeclaration: FirDeclaration,
-        copiedKtDeclaration: KtDeclaration,
+    fun <T : KtElement> createDeclarationCopy(
         state: FirModuleResolveState,
+        replacement: Pair<T, T>
     ): FirDeclaration {
-        return when (copiedKtDeclaration) {
+
+        val nonLocalDeclaration = LowLevelFirApiFacadeForDependentCopy.findEnclosingNonLocalDeclaration(replacement.first)
+            ?: error("Cannot find enclosing declaration for ${replacement.first.getElementTextInContext()}")
+
+        return when (nonLocalDeclaration) {
             is KtNamedFunction -> createFunctionCopy(
-                copiedKtDeclaration,
-                originalFirDeclaration as FirSimpleFunction,
-                state
+                nonLocalDeclaration,
+                state,
+                replacement
             )
             is KtProperty -> createPropertyCopy(
-                copiedKtDeclaration,
-                originalFirDeclaration as FirProperty,
-                state
+                nonLocalDeclaration,
+                state,
+                replacement
             )
             is KtClassOrObject -> createClassCopy(
-                copiedKtDeclaration,
-                originalFirDeclaration as FirRegularClass,
-                state
+                nonLocalDeclaration,
+                state,
+                replacement
             )
             is KtTypeAlias -> createTypeAliasCopy(
-                copiedKtDeclaration,
-                originalFirDeclaration as FirTypeAlias,
-                state
+                nonLocalDeclaration,
+                state,
+                replacement
             )
-            else -> error("Unsupported declaration ${copiedKtDeclaration::class.simpleName}")
+            else -> error("Unsupported declaration ${nonLocalDeclaration::class.simpleName}")
         }
     }
 
-    private fun createFunctionCopy(
-        element: KtNamedFunction,
-        originalFunction: FirSimpleFunction,
+    private fun <T : KtElement> createFunctionCopy(
+        rootNonLocalDeclaration: KtNamedFunction,
         state: FirModuleResolveState,
+        replacement: Pair<T, T>,
     ): FirSimpleFunction {
-        val builtFunction = createCopy(element, originalFunction)
+
+        val originalFunction = replacement.first.getOrBuildFirOfType<FirSimpleFunction>(state)
+        val builtFunction = createCopy(rootNonLocalDeclaration, originalFunction, replacement)
 
         // right now we can't resolve builtFunction header properly, as it built right in air,
         // without file, which is now required for running stages other then body resolve, so we
@@ -63,12 +69,13 @@ object DeclarationCopyBuilder {
         }.apply { reassignAllReturnTargets(builtFunction) }
     }
 
-    private fun createClassCopy(
-        copiedKtClassOrObject: KtClassOrObject,
-        originalFirClass: FirRegularClass,
+    private fun <T : KtElement> createClassCopy(
+        rootNonLocalDeclaration: KtClassOrObject,
         state: FirModuleResolveState,
+        replacement: Pair<T, T>,
     ): FirRegularClass {
-        val builtClass = createCopy(copiedKtClassOrObject, originalFirClass)
+        val originalFirClass = rootNonLocalDeclaration.getOrBuildFirOfType<FirRegularClass>(state)
+        val builtClass = createCopy(rootNonLocalDeclaration, originalFirClass, replacement)
 
         return buildRegularClassCopy(originalFirClass) {
             declarations.clear()
@@ -78,12 +85,14 @@ object DeclarationCopyBuilder {
         }
     }
 
-    private fun createTypeAliasCopy(
-        copiedKtTypeAlias: KtTypeAlias,
-        originalFirTypeAlias: FirTypeAlias,
+    private fun <T : KtElement> createTypeAliasCopy(
+        rootNonLocalDeclaration: KtTypeAlias,
         state: FirModuleResolveState,
+        replacement: Pair<T, T>,
     ): FirTypeAlias {
-        val builtTypeAlias = createCopy(copiedKtTypeAlias, originalFirTypeAlias)
+
+        val originalFirTypeAlias = rootNonLocalDeclaration.getOrBuildFirOfType<FirTypeAlias>(state)
+        val builtTypeAlias = createCopy(rootNonLocalDeclaration, originalFirTypeAlias, replacement)
 
         return buildTypeAliasCopy(originalFirTypeAlias) {
             expandedTypeRef = builtTypeAlias.expandedTypeRef
@@ -92,12 +101,13 @@ object DeclarationCopyBuilder {
         }
     }
 
-    private fun createPropertyCopy(
-        element: KtProperty,
-        originalProperty: FirProperty,
-        state: FirModuleResolveState
+    private fun <T : KtElement> createPropertyCopy(
+        rootNonLocalDeclaration: KtProperty,
+        state: FirModuleResolveState,
+        replacement: Pair<T, T>,
     ): FirProperty {
-        val builtProperty = createCopy(element, originalProperty)
+        val originalProperty = replacement.first.getOrBuildFirOfType<FirProperty>(state)
+        val builtProperty = createCopy(rootNonLocalDeclaration, originalProperty, replacement)
 
         val originalSetter = originalProperty.setter
         val builtSetter = builtProperty.setter
@@ -134,16 +144,18 @@ object DeclarationCopyBuilder {
         session = state.rootModuleSession
     }
 
-    internal inline fun <reified T : FirDeclaration> createCopy(
-        copiedKtDeclaration: KtDeclaration,
-        originalFirDeclaration: T,
-    ): T {
-        return RawFirFragmentForLazyBodiesBuilder.build(
+    internal inline fun <reified D : FirDeclaration, T : KtElement> createCopy(
+        rootNonLocalDeclaration: KtDeclaration,
+        originalFirDeclaration: D,
+        replacement: Pair<T, T>? = null,
+    ): D {
+        return RawFirFragmentForLazyBodiesBuilder.buildWithReplacement(
             session = originalFirDeclaration.session,
             baseScopeProvider = originalFirDeclaration.session.firIdeProvider.kotlinScopeProvider,
-            designation = originalFirDeclaration.collectDesignation().fullDesignation,
-            declaration = copiedKtDeclaration
-        ) as T
+            designation = originalFirDeclaration.collectDesignation().path,
+            rootNonLocalDeclaration = rootNonLocalDeclaration,
+            replacement = replacement,
+        ) as D
     }
 
     private fun FirFunction<*>.reassignAllReturnTargets(from: FirFunction<*>) {

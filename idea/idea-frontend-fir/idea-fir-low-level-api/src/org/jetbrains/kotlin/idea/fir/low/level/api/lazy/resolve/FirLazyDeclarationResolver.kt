@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.fir.resolve.ResolutionMode
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.resolve.providers.FirProvider
 import org.jetbrains.kotlin.fir.resolve.symbolProvider
+import org.jetbrains.kotlin.idea.fir.low.level.api.api.collectDesignation
 import org.jetbrains.kotlin.idea.fir.low.level.api.element.builder.FirTowerDataContextCollector
 import org.jetbrains.kotlin.idea.fir.low.level.api.element.builder.getNonLocalContainingOrThisDeclaration
 import org.jetbrains.kotlin.idea.fir.low.level.api.file.builder.FirFileBuilder
@@ -133,7 +134,7 @@ internal class FirLazyDeclarationResolver(
         resolveFileAnnotations(containerFirFile, moduleFileCache, scopeSession)
 
         val nonLocalDeclarationToResolve = firDeclarationToResolve.getNonLocalDeclarationToResolve(provider, moduleFileCache)
-        val designation = nonLocalDeclarationToResolve.getDesignation(containerFirFile, provider, moduleFileCache)
+        val designation = nonLocalDeclarationToResolve.collectDesignation().fullDesignation
 
         executeWithoutPCE {
             calculateLazyBodies(firDeclarationToResolve, designation)
@@ -204,25 +205,25 @@ internal class FirLazyDeclarationResolver(
         else -> error("Non-lazy phase $this")
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
-    private fun FirDeclaration.getDesignation(
-        containerFirFile: FirFile,
-        provider: FirProvider,
-        moduleFileCache: ModuleFileCache
-    ): List<FirDeclaration> = buildList {
-        if (this !is FirFile) {
-            val ktDeclaration = ktDeclaration
-            ktDeclaration.parentsOfType<KtClassOrObject>(withSelf = true)
-                .filter { it !is KtEnumEntry }
-                .map { it.findSourceNonLocalFirDeclaration(firFileBuilder, provider.symbolProvider, moduleFileCache, containerFirFile) }
-                .toList()
-                .asReversed()
-                .let(::addAll)
-            if (this@getDesignation is FirCallableDeclaration<*> || this@getDesignation is FirTypeAlias) {
-                add(this@getDesignation)
-            }
-        }
-    }
+//    @OptIn(ExperimentalStdlibApi::class)
+//    private fun FirDeclaration.getDesignation(
+//        containerFirFile: FirFile,
+//        provider: FirProvider,
+//        moduleFileCache: ModuleFileCache
+//    ): List<FirDeclaration> = buildList {
+//        if (this !is FirFile) {
+//            val ktDeclaration = ktDeclaration
+//            ktDeclaration.parentsOfType<KtClassOrObject>(withSelf = true)
+//                .filter { it !is KtEnumEntry }
+//                .map { it.findSourceNonLocalFirDeclaration(firFileBuilder, provider.symbolProvider, moduleFileCache, containerFirFile) }
+//                .toList()
+//                .asReversed()
+//                .let(::addAll)
+//            if (this@getDesignation is FirCallableDeclaration<*> || this@getDesignation is FirTypeAlias) {
+//                add(this@getDesignation)
+//            }
+//        }
+//    }
 
 
     private fun FirDeclaration.getNonLocalDeclarationToResolve(provider: FirProvider, moduleFileCache: ModuleFileCache): FirDeclaration {

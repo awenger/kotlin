@@ -153,12 +153,15 @@ open class RawFirBuilder(
             }
         }
 
-    protected inner class Visitor : KtVisitor<FirElement, Unit>() {
+    protected open inner class Visitor : KtVisitor<FirElement, Unit>() {
         private inline fun <reified R : FirElement> KtElement?.convertSafe(): R? =
-            this?.accept(this@Visitor, Unit) as? R
+            this?.let(::onConvert) as? R
 
         private inline fun <reified R : FirElement> KtElement.convert(): R =
-            this.accept(this@Visitor, Unit) as R
+            onConvert(this) as R
+
+        private fun KtProperty.convertProperty(ownerClassBuilder: FirClassBuilder?): FirProperty =
+            onConvertProperty(this, ownerClassBuilder)
 
         private fun KtTypeReference?.toFirOrImplicitType(): FirTypeRef =
             convertSafe() ?: buildImplicitTypeRef {
@@ -175,6 +178,12 @@ open class RawFirBuilder(
                     if (this@toFirOrErrorType == null) "Incomplete code" else "Conversion failed", DiagnosticKind.Syntax
                 )
             }
+
+        protected open fun onConvert(element: KtElement): FirElement? =
+            element.accept(this@Visitor, Unit)
+
+        protected open fun onConvertProperty(ktProperty: KtProperty, ownerClassBuilder: FirClassBuilder?): FirProperty =
+            ktProperty.toFirProperty(ownerClassBuilder)
 
         // Here we accept lambda as receiver to prevent expression calculation in stub mode
         private fun (() -> KtExpression?).toFirExpression(errorReason: String): FirExpression =
@@ -229,7 +238,7 @@ open class RawFirBuilder(
                     }
                 }
                 is KtProperty -> {
-                    toFirProperty(ownerClassBuilder)
+                    convertProperty(ownerClassBuilder)
                 }
                 else -> convert()
             }
@@ -1236,7 +1245,7 @@ open class RawFirBuilder(
             }
         }
 
-        fun KtProperty.toFirProperty(ownerClassBuilder: FirClassBuilder?): FirProperty {
+        open fun KtProperty.toFirProperty(ownerClassBuilder: FirClassBuilder?): FirProperty {
             val propertyType = typeReference.toFirOrImplicitType()
             val propertyName = nameAsSafeName
             val isVar = isVar
@@ -1346,7 +1355,7 @@ open class RawFirBuilder(
         }
 
         override fun visitProperty(property: KtProperty, data: Unit): FirElement {
-            return property.toFirProperty(ownerClassBuilder = null)
+            return property.convertProperty(ownerClassBuilder = null)
         }
 
         override fun visitTypeReference(typeReference: KtTypeReference, data: Unit): FirElement {

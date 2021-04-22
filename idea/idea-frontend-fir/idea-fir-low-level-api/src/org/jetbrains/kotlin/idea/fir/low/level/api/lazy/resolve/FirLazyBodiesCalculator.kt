@@ -33,7 +33,7 @@ internal object FirLazyBodiesCalculator {
             session = simpleFunction.session,
             baseScopeProvider = simpleFunction.session.firIdeProvider.kotlinScopeProvider,
             designation = designation,
-            declaration = simpleFunction.psi as KtNamedFunction
+            rootNonLocalDeclaration = simpleFunction.psi as KtNamedFunction
         ) as FirSimpleFunction
         simpleFunction.apply {
             replaceBody(newFunction.body)
@@ -49,7 +49,7 @@ internal object FirLazyBodiesCalculator {
             session = secondaryConstructor.session,
             baseScopeProvider = secondaryConstructor.session.firIdeProvider.kotlinScopeProvider,
             designation = designation,
-            declaration = secondaryConstructor.psi as KtSecondaryConstructor
+            rootNonLocalDeclaration = secondaryConstructor.psi as KtSecondaryConstructor
         ) as FirSimpleFunction
 
         secondaryConstructor.apply {
@@ -64,7 +64,7 @@ internal object FirLazyBodiesCalculator {
             session = firProperty.session,
             baseScopeProvider = firProperty.session.firIdeProvider.kotlinScopeProvider,
             designation = designation,
-            declaration = firProperty.psi as KtProperty
+            rootNonLocalDeclaration = firProperty.psi as KtProperty
         ) as FirProperty
 
         firProperty.getter?.takeIf { it.body is FirLazyBlock }?.let { getter ->
