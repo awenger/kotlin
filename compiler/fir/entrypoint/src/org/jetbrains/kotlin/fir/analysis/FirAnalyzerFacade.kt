@@ -86,7 +86,7 @@ class FirAnalyzerFacade(
 
     fun convertToIr(extensions: GeneratorExtensions): Fir2IrResult {
         if (_scopeSession == null) runResolution()
-        val signaturer = JvmIdSignatureDescriptor(JvmDescriptorMangler(null))
+        val signaturer = JvmIdSignatureDescriptor(JvmDescriptorMangler(languageVersionSettings))
 
         return Fir2IrConverter.createModuleFragment(
             session, _scopeSession!!, firFiles!!,
