@@ -13,7 +13,7 @@ import org.jetbrains.kotlin.psi.KtNamedFunction
 
 fun KtElement.isMainFunction(computedDescriptor: DeclarationDescriptor? = null): Boolean {
     if (this !is KtNamedFunction) return false
-    val mainFunctionDetector = MainFunctionDetector(languageVersionSettings) { it.resolveToDescriptorIfAny() }
+    val mainFunctionDetector = PsiMainFunctionDetector(languageVersionSettings) { it.resolveToDescriptorIfAny() }
 
     if (computedDescriptor != null) return mainFunctionDetector.isMain(computedDescriptor)
 

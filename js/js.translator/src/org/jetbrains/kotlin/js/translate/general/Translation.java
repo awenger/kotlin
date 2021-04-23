@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.descriptors.DeclarationDescriptor;
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor;
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor;
 import org.jetbrains.kotlin.descriptors.PropertyDescriptor;
-import org.jetbrains.kotlin.idea.MainFunctionDetector;
+import org.jetbrains.kotlin.idea.PsiMainFunctionDetector;
 import org.jetbrains.kotlin.js.backend.ast.*;
 import org.jetbrains.kotlin.js.backend.ast.metadata.MetadataProperties;
 import org.jetbrains.kotlin.js.config.JsConfig;
@@ -406,7 +406,8 @@ public final class Translation {
     ) {
         if (!mainCallParameters.shouldBeGenerated()) return null;
 
-        MainFunctionDetector mainFunctionDetector = new MainFunctionDetector(context.bindingContext(), config.getLanguageVersionSettings());
+        PsiMainFunctionDetector mainFunctionDetector =
+                new PsiMainFunctionDetector(context.bindingContext(), config.getLanguageVersionSettings());
 
         FunctionDescriptor functionDescriptor = null;
 

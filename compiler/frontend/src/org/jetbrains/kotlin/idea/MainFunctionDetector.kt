@@ -19,78 +19,14 @@ package org.jetbrains.kotlin.idea
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
-import org.jetbrains.kotlin.descriptors.*
-import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.psi.KtDeclaration
-import org.jetbrains.kotlin.psi.KtNamedFunction
-import org.jetbrains.kotlin.resolve.BindingContext
-import org.jetbrains.kotlin.resolve.BindingTrace
-import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
+import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.annotations.hasJvmStaticAnnotation
-import org.jetbrains.kotlin.resolve.descriptorUtil.module
-import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import org.jetbrains.kotlin.types.Variance
-import org.jetbrains.kotlin.utils.KotlinExceptionWithAttachments
 
-class MainFunctionDetector {
-    private val getFunctionDescriptor: (KtNamedFunction) -> FunctionDescriptor?
-    private val languageVersionSettings: LanguageVersionSettings
-
-    /** Assumes that the function declaration is already resolved and the descriptor can be found in the `bindingContext`.  */
-    constructor(bindingContext: BindingContext, languageVersionSettings: LanguageVersionSettings) {
-        this.getFunctionDescriptor = { function ->
-            bindingContext.get(BindingContext.FUNCTION, function)
-                ?: throw throw KotlinExceptionWithAttachments("No descriptor resolved for $function")
-                    .withAttachment("function.text", function.text)
-        }
-        this.languageVersionSettings = languageVersionSettings
-    }
-
-    constructor(languageVersionSettings: LanguageVersionSettings, functionResolver: (KtNamedFunction) -> FunctionDescriptor?) {
-        this.getFunctionDescriptor = functionResolver
-        this.languageVersionSettings = languageVersionSettings
-    }
-
-    fun hasMain(declarations: List<KtDeclaration>): Boolean {
-        return findMainFunction(declarations) != null
-    }
-
-    @JvmOverloads
-    fun isMain(
-        function: KtNamedFunction,
-        checkJvmStaticAnnotation: Boolean = true,
-        allowParameterless: Boolean = true
-    ): Boolean {
-        if (function.isLocal) {
-            return false
-        }
-
-        var parametersCount = function.valueParameters.size
-        if (function.receiverTypeReference != null) parametersCount++
-
-        if (!isParameterNumberSuitsForMain(parametersCount, function.isTopLevel, allowParameterless)) {
-            return false
-        }
-
-        if (!function.typeParameters.isEmpty()) {
-            return false
-        }
-
-        /* Psi only check for kotlin.jvm.jvmName annotation */
-        if ("main" != function.name && !hasAnnotationWithExactNumberOfArguments(function, 1)) {
-            return false
-        }
-
-        /* Psi only check for kotlin.jvm.jvmStatic annotation */
-        if (checkJvmStaticAnnotation && !function.isTopLevel && !hasAnnotationWithExactNumberOfArguments(function, 0)) {
-            return false
-        }
-
-        val functionDescriptor = getFunctionDescriptor(function) ?: return false
-        return isMain(functionDescriptor, checkJvmStaticAnnotation, allowParameterless = allowParameterless)
-    }
-
+abstract class MainFunctionDetector(protected val languageVersionSettings: LanguageVersionSettings) {
     @JvmOverloads
     fun isMain(
         descriptor: DeclarationDescriptor,
@@ -107,12 +43,7 @@ class MainFunctionDetector {
         val parameters = descriptor.valueParameters.mapTo(mutableListOf()) { it.type }
         descriptor.extensionReceiverParameter?.type?.let { parameters += it }
 
-        if (!isParameterNumberSuitsForMain(
-                parameters.size,
-                DescriptorUtils.isTopLevelDeclaration(descriptor),
-                allowParameterless
-            )
-        ) {
+        if (!isParameterNumberSuitsForMain(parameters.size, DescriptorUtils.isTopLevelDeclaration(descriptor), allowParameterless)) {
             return false
         }
 
@@ -135,13 +66,13 @@ class MainFunctionDetector {
         } else {
             assert(parameters.size == 0) { "Parameter list is expected to be empty" }
             assert(DescriptorUtils.isTopLevelDeclaration(descriptor)) { "main without parameters works only for top-level" }
-            val containingFile = DescriptorToSourceUtils.getContainingFile(descriptor)
             // We do not support parameterless entry points having JvmName("name") but different real names
             // See more at https://github.com/Kotlin/KEEP/blob/master/proposals/enhancing-main-convention.md#parameterless-main
             if (descriptor.name.asString() != "main") return false
-            if (containingFile?.declarations?.any { declaration -> isMainWithParameter(declaration, checkJvmStaticAnnotation) } == true) {
-                return false
-            }
+
+            if (descriptor.getFunctionsFromTheSameFile().any { declaration ->
+                    isMain(declaration, checkJvmStaticAnnotation, allowParameterless = false)
+                }) return false
         }
 
         if (descriptor.isSuspend && !languageVersionSettings.supportsFeature(LanguageFeature.ExtendedMainConvention)) return false
@@ -156,36 +87,13 @@ class MainFunctionDetector {
                 && (descriptor.hasJvmStaticAnnotation() || !checkJvmStaticAnnotation)
     }
 
-    private fun isMainWithParameter(
-        declaration: KtDeclaration,
-        checkJvmStaticAnnotation: Boolean
-    ) = declaration is KtNamedFunction && isMain(declaration, checkJvmStaticAnnotation, allowParameterless = false)
+    protected abstract fun FunctionDescriptor.getFunctionsFromTheSameFile(): Collection<FunctionDescriptor>
 
-    fun getMainFunction(module: ModuleDescriptor): FunctionDescriptor? = getMainFunction(module, module.getPackage(FqName.ROOT))
-
-    private fun getMainFunction(module: ModuleDescriptor, packageView: PackageViewDescriptor): FunctionDescriptor? {
-        for (packageFragment in packageView.fragments.filter { it.module == module }) {
-            DescriptorUtils.getAllDescriptors(packageFragment.getMemberScope())
-                .filterIsInstance<FunctionDescriptor>()
-                .firstOrNull { isMain(it) }
-                ?.let { return it }
-        }
-
-        for (subpackageName in module.getSubPackagesOf(packageView.fqName, MemberScope.ALL_NAME_FILTER)) {
-            getMainFunction(module, module.getPackage(subpackageName))?.let { return it }
-        }
-
-        return null
-    }
-
-    private fun findMainFunction(declarations: List<KtDeclaration>) =
-        declarations.filterIsInstance<KtNamedFunction>().find { isMain(it) }
-
-    private fun isParameterNumberSuitsForMain(
+    protected fun isParameterNumberSuitsForMain(
         parametersCount: Int,
         isTopLevel: Boolean,
         allowParameterless: Boolean
-    ) = when (parametersCount) {
+    ): Boolean = when (parametersCount) {
         1 -> true
         0 -> isTopLevel && allowParameterless && languageVersionSettings.supportsFeature(LanguageFeature.ExtendedMainConvention)
         else -> false
@@ -199,23 +107,6 @@ class MainFunctionDetector {
 
         private fun getJVMFunctionName(functionDescriptor: FunctionDescriptor): String {
             return DescriptorUtils.getJvmName(functionDescriptor) ?: functionDescriptor.name.asString()
-        }
-
-        private fun hasAnnotationWithExactNumberOfArguments(function: KtNamedFunction, number: Int) =
-            function.annotationEntries.any { it.valueArguments.size == number }
-    }
-
-    interface Factory {
-        fun createMainFunctionDetector(trace: BindingTrace, languageVersionSettings: LanguageVersionSettings): MainFunctionDetector
-
-        class Ordinary : Factory {
-            override fun createMainFunctionDetector(
-                trace: BindingTrace,
-                languageVersionSettings: LanguageVersionSettings
-            ): MainFunctionDetector {
-                return MainFunctionDetector(trace.bindingContext, languageVersionSettings)
-            }
-
         }
     }
 }

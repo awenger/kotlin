@@ -20,7 +20,7 @@ import com.intellij.testFramework.MapDataContext
 import org.jetbrains.kotlin.checkers.languageVersionSettingsFromText
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
-import org.jetbrains.kotlin.idea.MainFunctionDetector
+import org.jetbrains.kotlin.idea.PsiMainFunctionDetector
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptorIfAny
 import org.jetbrains.kotlin.idea.project.withLanguageVersionSettings
 import org.jetbrains.kotlin.idea.search.allScope
@@ -224,7 +224,7 @@ class RunConfigurationTest : AbstractRunConfigurationTest() {
                 val assertIsMain = "yes" in options
                 val assertIsNotMain = "no" in options
 
-                val isMainFunction = MainFunctionDetector(fileLanguageSettings) { it.resolveToDescriptorIfAny() }.isMain(function)
+                val isMainFunction = PsiMainFunctionDetector(fileLanguageSettings) { it.resolveToDescriptorIfAny() }.isMain(function)
 
                 if (assertIsMain) {
                     assertTrue("$file: The function ${function.fqName?.asString()} should be main", isMainFunction)

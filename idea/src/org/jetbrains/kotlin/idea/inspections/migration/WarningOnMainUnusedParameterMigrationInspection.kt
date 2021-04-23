@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.diagnostics.Diagnostic
 import org.jetbrains.kotlin.diagnostics.DiagnosticFactoryWithPsiElement
 import org.jetbrains.kotlin.diagnostics.Errors
-import org.jetbrains.kotlin.idea.MainFunctionDetector
+import org.jetbrains.kotlin.idea.PsiMainFunctionDetector
 import org.jetbrains.kotlin.idea.configuration.MigrationInfo
 import org.jetbrains.kotlin.idea.configuration.isLanguageVersionUpdate
 import org.jetbrains.kotlin.idea.project.languageVersionSettings
@@ -21,7 +21,6 @@ import org.jetbrains.kotlin.idea.quickfix.migration.MigrationFix
 import org.jetbrains.kotlin.idea.search.usagesSearch.descriptor
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameter
-
 
 class WarningOnMainUnusedParameterMigrationInspection :
     AbstractDiagnosticBasedMigrationInspection<KtParameter>(KtParameter::class.java),
@@ -34,10 +33,10 @@ class WarningOnMainUnusedParameterMigrationInspection :
     override val diagnosticFactory: DiagnosticFactoryWithPsiElement<KtParameter, *>
         get() = Errors.UNUSED_PARAMETER
 
-    override fun getCustomIntentionFactory(): ((Diagnostic) -> IntentionAction?)? = fun(diagnostic: Diagnostic): IntentionAction? {
+    override fun getCustomIntentionFactory(): ((Diagnostic) -> IntentionAction?) = fun(diagnostic: Diagnostic): IntentionAction? {
         val parameter = diagnostic.psiElement as? KtParameter ?: return null
         val ownerFunction = parameter.ownerFunction as? KtNamedFunction ?: return null
-        val mainFunctionDetector = MainFunctionDetector(parameter.languageVersionSettings) { it.descriptor as? FunctionDescriptor }
+        val mainFunctionDetector = PsiMainFunctionDetector(parameter.languageVersionSettings) { it.descriptor as? FunctionDescriptor }
         if (!mainFunctionDetector.isMain(ownerFunction)) return null
         return RemoveUnusedFunctionParameterFix(parameter, false)
     }

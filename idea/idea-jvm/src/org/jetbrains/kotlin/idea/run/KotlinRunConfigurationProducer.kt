@@ -27,7 +27,7 @@ import com.intellij.psi.util.ClassUtil
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.fileClasses.javaFileFacadeFqName
-import org.jetbrains.kotlin.idea.MainFunctionDetector
+import org.jetbrains.kotlin.idea.PsiMainFunctionDetector
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptorIfAny
 import org.jetbrains.kotlin.idea.project.languageVersionSettings
 import org.jetbrains.kotlin.idea.util.ProjectRootsUtil
@@ -74,7 +74,7 @@ class KotlinRunConfigurationProducer : LazyRunConfigurationProducer<KotlinRunCon
             if (!(psiFile is KtFile && ProjectRootsUtil.isInProjectOrLibSource(psiFile))) return null
 
             val mainFunctionDetector =
-                MainFunctionDetector(psiFile.languageVersionSettings) { it.resolveToDescriptorIfAny(BodyResolveMode.FULL) }
+                PsiMainFunctionDetector(psiFile.languageVersionSettings) { it.resolveToDescriptorIfAny(BodyResolveMode.FULL) }
 
             var currentElement = locationElement.declarationContainer(false)
             while (currentElement != null) {

@@ -26,6 +26,7 @@ import org.jetbrains.kotlin.context.ModuleContext
 import org.jetbrains.kotlin.contracts.ContractDeserializerImpl
 import org.jetbrains.kotlin.extensions.StorageComponentContainerContributor
 import org.jetbrains.kotlin.idea.MainFunctionDetector
+import org.jetbrains.kotlin.idea.PsiMainFunctionDetector
 import org.jetbrains.kotlin.incremental.components.ExpectActualTracker
 import org.jetbrains.kotlin.incremental.components.LookupTracker
 import org.jetbrains.kotlin.platform.TargetPlatform
@@ -160,7 +161,7 @@ fun createContainerForLazyBodyResolve(
     analyzerServices: PlatformDependentAnalyzerServices,
     languageVersionSettings: LanguageVersionSettings,
     moduleStructureOracle: ModuleStructureOracle,
-    mainFunctionDetectorFactory: MainFunctionDetector.Factory,
+    mainFunctionDetectorFactory: PsiMainFunctionDetector.Factory,
     sealedProvider: SealedClassInheritorsProvider,
     controlFlowInformationProviderFactory: ControlFlowInformationProvider.Factory,
 ): StorageComponentContainer = createContainer("LazyBodyResolve", analyzerServices) {

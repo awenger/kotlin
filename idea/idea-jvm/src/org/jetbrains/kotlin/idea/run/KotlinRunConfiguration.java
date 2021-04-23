@@ -55,7 +55,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.asJava.classes.KtLightClassForSourceDeclaration;
 import org.jetbrains.kotlin.asJava.elements.KtLightMethod;
 import org.jetbrains.kotlin.idea.KotlinJvmBundle;
-import org.jetbrains.kotlin.idea.MainFunctionDetector;
+import org.jetbrains.kotlin.idea.PsiMainFunctionDetector;
 import org.jetbrains.kotlin.idea.caches.resolve.ResolutionUtils;
 import org.jetbrains.kotlin.idea.core.FileIndexUtilsKt;
 import org.jetbrains.kotlin.idea.project.PlatformKt;
@@ -356,8 +356,8 @@ public class KotlinRunConfiguration extends JetRunConfiguration implements Input
     private static KtNamedFunction findMainFun(@NotNull PsiClass psiClass) {
         for (KtNamedFunction function : getMainFunCandidates(psiClass)) {
             BindingContext bindingContext = ResolutionUtils.analyze(function, BodyResolveMode.FULL);
-            MainFunctionDetector mainFunctionDetector =
-                    new MainFunctionDetector(bindingContext, PlatformKt.getLanguageVersionSettings(function));
+            PsiMainFunctionDetector mainFunctionDetector =
+                    new PsiMainFunctionDetector(bindingContext, PlatformKt.getLanguageVersionSettings(function));
             if (mainFunctionDetector.isMain(function)) return function;
         }
         return null;

@@ -21,12 +21,11 @@ import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.diagnostics.Errors
 import org.jetbrains.kotlin.diagnostics.reportOnDeclaration
-import org.jetbrains.kotlin.idea.MainFunctionDetector
+import org.jetbrains.kotlin.idea.PsiMainFunctionDetector
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.name.FqNameUnsafe
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.descriptorUtil.platform
-
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import java.util.*
 
@@ -35,9 +34,8 @@ class OverloadResolver(
     private val overloadFilter: OverloadFilter,
     private val overloadChecker: OverloadChecker,
     languageVersionSettings: LanguageVersionSettings,
-    mainFunctionDetectorFactory: MainFunctionDetector.Factory
+    mainFunctionDetectorFactory: PsiMainFunctionDetector.Factory
 ) {
-
     private val mainFunctionDetector = mainFunctionDetectorFactory.createMainFunctionDetector(trace, languageVersionSettings)
 
     fun checkOverloads(c: BodiesResolveContext) {

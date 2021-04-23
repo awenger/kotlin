@@ -32,7 +32,7 @@ import org.jetbrains.kotlin.diagnostics.DiagnosticFactory
 import org.jetbrains.kotlin.diagnostics.Errors
 import org.jetbrains.kotlin.diagnostics.Errors.*
 import org.jetbrains.kotlin.diagnostics.WhenMissingCase
-import org.jetbrains.kotlin.idea.MainFunctionDetector
+import org.jetbrains.kotlin.idea.PsiMainFunctionDetector
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
@@ -739,7 +739,7 @@ class ControlFlowInformationProviderImpl private constructor(
                 if (anonymous && !languageVersionSettings.supportsFeature(LanguageFeature.SingleUnderscoreForParameterName)) {
                     return
                 }
-                val mainFunctionDetector = MainFunctionDetector(trace.bindingContext, languageVersionSettings)
+                val mainFunctionDetector = PsiMainFunctionDetector(trace.bindingContext, languageVersionSettings)
                 val isMain = owner is KtNamedFunction && mainFunctionDetector.isMain(owner)
                 val functionName = functionDescriptor.name
                 if (isMain) {
