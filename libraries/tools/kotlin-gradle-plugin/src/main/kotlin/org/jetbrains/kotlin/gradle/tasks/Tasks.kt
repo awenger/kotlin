@@ -40,8 +40,6 @@ import org.jetbrains.kotlin.gradle.internal.tasks.allOutputFiles
 import org.jetbrains.kotlin.gradle.logging.*
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.COMPILER_CLASSPATH_CONFIGURATION_NAME
-import org.jetbrains.kotlin.gradle.plugin.mpp.AbstractKotlinCompilation
-import org.jetbrains.kotlin.gradle.plugin.mpp.associateWithTransitiveClosure
 import org.jetbrains.kotlin.gradle.report.ReportingSettings
 import org.jetbrains.kotlin.gradle.targets.js.ir.isProduceUnzippedKlib
 import org.jetbrains.kotlin.gradle.utils.*
@@ -158,7 +156,7 @@ public class GradleCompileTaskProvider {
     val buildModulesInfo: Provider<out IncrementalModuleInfoProvider> /*= GradleCompilerRunner.buildModulesInfo(project.gradle)*/
 }
 
-abstract class AbstractKotlinCompile<T : CommonCompilerArguments>() : AbstractKotlinCompileTool<T>() {
+abstract class AbstractKotlinCompile<T : CommonCompilerArguments> : AbstractKotlinCompileTool<T>(), UsesKotlinJavaToolchain {
 
     init {
         cacheOnlyIfEnabledForKotlin()
@@ -311,11 +309,28 @@ abstract class AbstractKotlinCompile<T : CommonCompilerArguments>() : AbstractKo
 
     private val kotlinLogger by lazy { GradleKotlinLogger(logger) }
 
-    /** Keep lazy to avoid computing before all projects are evaluated. */
-    @get:Internal
-    internal val compilerRunner by lazy { compilerRunner() }
+    final override val kotlinJavaToolchainProvider: Provider<KotlinJavaToolchain> =
+        objects.propertyWithNewInstance()
 
-    internal open fun compilerRunner(): GradleCompilerRunner = GradleCompilerRunner(GradleCompileTaskProvider(this))
+    @get:Internal
+    internal val compilerRunner: Provider<GradleCompilerRunner> =
+        objects.propertyWithConvention(
+            kotlinJavaToolchainProvider.map {
+                compilerRunner(
+                    it.javaExecutable.get().asFile,
+                    it.jdkToolsJar.orNull
+                )
+            }
+        )
+
+    internal open fun compilerRunner(
+        javaExecutable: File,
+        jdkToolsJar: File?
+    ): GradleCompilerRunner = GradleCompilerRunner(
+        GradleCompileTaskProvider(this),
+        javaExecutable,
+        jdkToolsJar
+    )
 
     private val systemPropertiesService = CompilerSystemPropertiesService.registerIfAbsent(project.gradle)
 
@@ -358,9 +373,6 @@ abstract class AbstractKotlinCompile<T : CommonCompilerArguments>() : AbstractKo
     private val projectDir = project.rootProject.projectDir
 
     private fun executeImpl(inputs: IncrementalTaskInputs) {
-        // Check that the JDK tools are available in Gradle (fail-fast, instead of a fail during the compiler run):
-        findToolsJar()
-
         val sourceRoots = getSourceRoots()
         val allKotlinSources = sourceRoots.kotlinSourceFiles
 
@@ -522,7 +534,7 @@ open class KotlinCompile : AbstractKotlinCompile<K2JVMCompilerArguments>(), Kotl
 
         val messageCollector = GradlePrintingMessageCollector(logger, args.allWarningsAsErrors)
         val outputItemCollector = OutputItemsCollectorImpl()
-        val compilerRunner = compilerRunner
+        val compilerRunner = compilerRunner.get()
 
         val icEnv = if (isIncrementalCompilationEnabled()) {
             logger.info(USING_JVM_INCREMENTAL_COMPILATION_MESSAGE)
@@ -598,11 +610,15 @@ internal open class KotlinCompileWithWorkers @Inject constructor(
     private val workerExecutor: WorkerExecutor
 ) : KotlinCompile() {
 
-    override fun compilerRunner() =
-        GradleCompilerRunnerWithWorkers(
-            GradleCompileTaskProvider(this),
-            workerExecutor
-        )
+    override fun compilerRunner(
+        javaExecutable: File,
+        jdkToolsJar: File?
+    ) = GradleCompilerRunnerWithWorkers(
+        GradleCompileTaskProvider(this),
+        javaExecutable,
+        jdkToolsJar,
+        workerExecutor
+    )
 }
 
 @CacheableTask
@@ -611,22 +627,30 @@ internal open class Kotlin2JsCompileWithWorkers @Inject constructor(
     private val workerExecutor: WorkerExecutor
 ) : Kotlin2JsCompile(objectFactory) {
 
-    override fun compilerRunner() =
-        GradleCompilerRunnerWithWorkers(
-            GradleCompileTaskProvider(this),
-            workerExecutor
-        )
+    override fun compilerRunner(
+        javaExecutable: File,
+        jdkToolsJar: File?
+    ) = GradleCompilerRunnerWithWorkers(
+        GradleCompileTaskProvider(this),
+        javaExecutable,
+        jdkToolsJar,
+        workerExecutor
+    )
 }
 
 @CacheableTask
 internal open class KotlinCompileCommonWithWorkers @Inject constructor(
     private val workerExecutor: WorkerExecutor
 ) : KotlinCompileCommon() {
-    override fun compilerRunner() =
-        GradleCompilerRunnerWithWorkers(
-            GradleCompileTaskProvider(this),
-            workerExecutor
-        )
+    override fun compilerRunner(
+        javaExecutable: File,
+        jdkToolsJar: File?
+    ) = GradleCompilerRunnerWithWorkers(
+        GradleCompileTaskProvider(this),
+        javaExecutable,
+        jdkToolsJar,
+        workerExecutor
+    )
 }
 
 @CacheableTask
@@ -782,7 +806,7 @@ open class Kotlin2JsCompile @Inject constructor(
 
         val messageCollector = GradlePrintingMessageCollector(logger, args.allWarningsAsErrors)
         val outputItemCollector = OutputItemsCollectorImpl()
-        val compilerRunner = compilerRunner
+        val compilerRunner = compilerRunner.get()
 
         val icEnv = if (isIncrementalCompilationEnabled()) {
             logger.info(USING_JS_INCREMENTAL_COMPILATION_MESSAGE)
