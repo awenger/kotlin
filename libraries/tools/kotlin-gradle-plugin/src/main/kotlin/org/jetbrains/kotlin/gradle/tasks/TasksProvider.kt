@@ -153,7 +153,7 @@ internal open class KotlinTasksProvider {
 
             applyLanguageSettingsToKotlinOptions(
                 compilation.languageSettings,
-                (kotlinTaskHolder.get() as org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>).kotlinOptions
+                (kotlinTaskHolder.get() as org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>).kotlinOptions as KotlinCommonOptions
             )
         }
     }

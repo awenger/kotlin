@@ -14,6 +14,7 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileTree
 import org.gradle.api.logging.Logger
+import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.*
 import org.gradle.api.tasks.compile.AbstractCompile
@@ -23,7 +24,6 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinCommonToolOptions
 import org.jetbrains.kotlin.gradle.dsl.KotlinCompile
 import org.jetbrains.kotlin.gradle.dsl.NativeCacheKind
 import org.jetbrains.kotlin.gradle.internal.ensureParentDirsCreated
-import org.jetbrains.kotlin.gradle.plugin.LanguageSettingsBuilder
 import org.jetbrains.kotlin.gradle.plugin.cocoapods.asValidFrameworkName
 import org.jetbrains.kotlin.gradle.plugin.mpp.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.KotlinNativeCompilationData
@@ -117,7 +117,8 @@ private fun Collection<File>.filterKlibsPassedToCompiler(): List<File> = filter 
 }
 
 // endregion
-abstract class AbstractKotlinNativeCompile<T : KotlinCommonToolOptions, K : KotlinNativeCompilationData<*>> : AbstractCompile() {
+abstract class AbstractKotlinNativeCompile<T : KotlinCommonToolOptions, K : KotlinNativeCompilationData<*>> : AbstractCompile(),
+    KotlinCompile<T> {
     @get:Internal
     abstract val compilation: K
 
@@ -172,11 +173,6 @@ abstract class AbstractKotlinNativeCompile<T : KotlinCommonToolOptions, K : Kotl
     val target: String by project.provider { compilation.konanTarget.name }
 
     // region Compiler options.
-    @get:Internal
-    abstract val kotlinOptions: T
-    abstract fun kotlinOptions(fn: T.() -> Unit)
-    abstract fun kotlinOptions(fn: Closure<*>)
-
     @get:Input
     abstract val additionalCompilerOptions: Provider<Collection<String>>
 
@@ -349,8 +345,7 @@ constructor(
     @Internal
     @Transient  // can't be serialized for Gradle configuration cache
     final override val compilation: KotlinNativeCompilationData<*>
-) : AbstractKotlinNativeCompile<KotlinCommonOptions, KotlinNativeCompilationData<*>>(),
-    KotlinCompile<KotlinCommonOptions> {
+) : AbstractKotlinNativeCompile<KotlinCommonOptions, KotlinNativeCompilationData<*>>() {
 
     @get:Input
     override val outputKind = LIBRARY
@@ -389,11 +384,6 @@ constructor(
     @get:Internal // these sources are normally a subset of `source` ones which are already tracked
     val commonSources: ConfigurableFileCollection = project.files()
 
-//    private val commonSources: FileCollection by lazy {
-//        // Already taken into account in getSources method.
-//        project.files(compilation.map { it.commonSources }).asFileTree
-//    }
-
     private val commonSourcesTree: FileTree
         get() = commonSources.asFileTree
 
@@ -418,22 +408,12 @@ constructor(
     // endregion.
 
     // region Kotlin options.
-    override val kotlinOptions: KotlinCommonOptions by project.provider {
-        compilation.kotlinOptions
-    }
+    override val kotlinOptionsProperty: Property<KotlinCommonOptions> =
+        objects.property(KotlinCommonOptions::class.java).value(project.provider { compilation.kotlinOptions })
 
     @get:Input
     override val additionalCompilerOptions: Provider<Collection<String>> = project.provider {
         kotlinOptions.freeCompilerArgs
-    }
-
-    override fun kotlinOptions(fn: KotlinCommonOptions.() -> Unit) {
-        kotlinOptions.fn()
-    }
-
-    override fun kotlinOptions(fn: Closure<*>) {
-        fn.delegate = kotlinOptions
-        fn.call()
     }
     // endregion.
 
@@ -477,7 +457,7 @@ constructor(
  * A task producing a final binary from a compilation.
  */
 @CacheableTask
-open class KotlinNativeLink
+abstract class KotlinNativeLink
 @Inject
 constructor(
     @Internal
@@ -541,16 +521,8 @@ constructor(
         kotlinOptions.freeCompilerArgs + compilation.kotlinOptions.freeCompilerArgs
     }
 
-    override val kotlinOptions: KotlinCommonToolOptions = NativeLinkOptions()
-
-    override fun kotlinOptions(fn: KotlinCommonToolOptions.() -> Unit) {
-        kotlinOptions.fn()
-    }
-
-    override fun kotlinOptions(fn: Closure<*>) {
-        fn.delegate = kotlinOptions
-        fn.call()
-    }
+    override val kotlinOptionsProperty: Property<KotlinCommonToolOptions> =
+        objects.property(KotlinCommonToolOptions::class.java).value(NativeLinkOptions())
 
     // Binary-specific options.
     val entryPoint: String?

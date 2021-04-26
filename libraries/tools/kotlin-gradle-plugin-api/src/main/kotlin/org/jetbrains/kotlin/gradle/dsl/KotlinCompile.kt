@@ -7,11 +7,17 @@ package org.jetbrains.kotlin.gradle.dsl
 
 import groovy.lang.Closure
 import org.gradle.api.Task
+import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Internal
 
-interface KotlinCompile<out T : KotlinCommonOptions> : Task {
+interface KotlinCompile<out T : KotlinCommonToolOptions> : Task {
+
+    @get:Internal
+    val kotlinOptionsProperty: Property<out T>
+
     @get:Internal
     val kotlinOptions: T
+        get() = kotlinOptionsProperty.get()
 
     fun kotlinOptions(fn: T.() -> Unit) {
         kotlinOptions.fn()
