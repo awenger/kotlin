@@ -144,7 +144,8 @@ object LowLevelFirApiFacadeForDependentCopy {
                 fromPhase = copiedFirDeclaration.resolvePhase,
                 toPhase = FirResolvePhase.BODY_RESOLVE,
                 towerDataContextCollector = collector,
-                checkPCE = true
+                checkPCE = true,
+                lastNonLazyPhase = FirResolvePhase.IMPORTS
             )
         }
 

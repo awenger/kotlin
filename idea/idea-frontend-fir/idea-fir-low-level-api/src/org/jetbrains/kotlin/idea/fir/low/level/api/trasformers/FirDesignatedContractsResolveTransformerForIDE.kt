@@ -7,15 +7,17 @@ package org.jetbrains.kotlin.idea.fir.low.level.api.trasformers
 
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
+import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.resolve.ResolutionMode
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.resolve.transformers.contracts.FirContractResolveTransformer
 
 internal class FirDesignatedContractsResolveTransformerForIDE(
+    private val firFile: FirFile,
     designation: FirDesignation,
     session: FirSession,
     scopeSession: ScopeSession,
-) : FirContractResolveTransformer(session, scopeSession) {
+) : FirDesignatedResolveTransformerForIDE, FirContractResolveTransformer(session, scopeSession) {
     private val ideDeclarationTransformer = IDEDeclarationTransformer(designation)
 
     @Suppress("NAME_SHADOWING")
@@ -26,4 +28,8 @@ internal class FirDesignatedContractsResolveTransformerForIDE(
 
 
     override fun needReplacePhase(firDeclaration: FirDeclaration): Boolean = ideDeclarationTransformer.needReplacePhase(firDeclaration)
+
+    override fun transformDesignatedDeclaration() {
+        firFile.transform<FirFile, ResolutionMode>(this, ResolutionMode.ContextDependent)
+    }
 }

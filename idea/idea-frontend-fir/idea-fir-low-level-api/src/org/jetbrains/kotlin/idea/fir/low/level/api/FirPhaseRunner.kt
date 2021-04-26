@@ -51,6 +51,7 @@ internal class FirPhaseRunner {
         FirResolvePhase.IMPLICIT_TYPES_BODY_RESOLVE -> implicitTypesResolveLock.withLock {
             runPhaseWithCustomResolveWithoutLock(resolve)
         }
+        //TODO: Make correct sync for TYPES, SUPER_TYPES and STATUS phases
         else -> {
             runPhaseWithCustomResolveWithoutLock(resolve)
         }

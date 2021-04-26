@@ -19,11 +19,12 @@ import org.jetbrains.kotlin.idea.fir.low.level.api.element.builder.FirIdeDesigna
 import org.jetbrains.kotlin.idea.fir.low.level.api.element.builder.FirTowerDataContextCollector
 
 internal class FirDesignatedBodyResolveTransformerForIDE(
+    private val firFile: FirFile,
     designation: FirDesignation,
     session: FirSession,
     scopeSession: ScopeSession,
     private val towerDataContextCollector: FirTowerDataContextCollector? = null
-) : FirBodyResolveTransformer(
+) : FirDesignatedResolveTransformerForIDE, FirBodyResolveTransformer(
     session,
     phase = FirResolvePhase.BODY_RESOLVE,
     implicitTypeOnly = false,
@@ -57,5 +58,9 @@ internal class FirDesignatedBodyResolveTransformerForIDE(
 
     override fun needReplacePhase(firDeclaration: FirDeclaration): Boolean =
         ideDeclarationTransformer.needReplacePhase(firDeclaration)
+
+    override fun transformDesignatedDeclaration() {
+        firFile.transform<FirFile, ResolutionMode>(this, ResolutionMode.ContextDependent)
+    }
 }
 

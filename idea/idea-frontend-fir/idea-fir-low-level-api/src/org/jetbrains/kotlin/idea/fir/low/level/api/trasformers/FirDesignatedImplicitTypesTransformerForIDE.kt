@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.idea.fir.low.level.api.trasformers
 
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
+import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.expressions.FirStatement
 import org.jetbrains.kotlin.fir.resolve.ResolutionMode
@@ -18,12 +19,13 @@ import org.jetbrains.kotlin.idea.fir.low.level.api.element.builder.FirIdeDesigna
 import org.jetbrains.kotlin.idea.fir.low.level.api.element.builder.FirTowerDataContextCollector
 
 internal class FirDesignatedImplicitTypesTransformerForIDE(
+    private val firFile: FirFile,
     designation: FirDesignation,
     session: FirSession,
     scopeSession: ScopeSession,
     private val towerDataContextCollector: FirTowerDataContextCollector?,
     implicitBodyResolveComputationSession: ImplicitBodyResolveComputationSession = ImplicitBodyResolveComputationSession(),
-) : FirImplicitAwareBodyResolveTransformer(
+) : FirDesignatedResolveTransformerForIDE, FirImplicitAwareBodyResolveTransformer(
     session,
     implicitBodyResolveComputationSession = implicitBodyResolveComputationSession,
     phase = FirResolvePhase.IMPLICIT_TYPES_BODY_RESOLVE,
@@ -53,5 +55,9 @@ internal class FirDesignatedImplicitTypesTransformerForIDE(
 
     override fun onBeforeDeclarationContentResolve(declaration: FirDeclaration) {
         towerDataContextCollector?.addDeclarationContext(declaration, context.towerDataContext)
+    }
+
+    override fun transformDesignatedDeclaration() {
+        firFile.transform<FirFile, ResolutionMode>(this, ResolutionMode.ContextDependent)
     }
 }

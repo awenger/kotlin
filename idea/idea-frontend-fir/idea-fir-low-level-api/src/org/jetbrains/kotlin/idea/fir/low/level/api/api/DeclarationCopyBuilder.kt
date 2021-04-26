@@ -82,6 +82,7 @@ object DeclarationCopyBuilder {
             declarations.addAll(builtClass.declarations)
             symbol = builtClass.symbol
             initDeclaration(originalFirClass, builtClass, state)
+            resolvePhase = minOf(originalFirClass.resolvePhase, FirResolvePhase.IMPORTS) //TODO move into initDeclaration?
         }
     }
 

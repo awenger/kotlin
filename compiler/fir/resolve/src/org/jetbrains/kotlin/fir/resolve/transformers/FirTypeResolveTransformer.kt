@@ -37,7 +37,7 @@ fun <F : FirClassLikeDeclaration<F>> F.runTypeResolvePhaseForLocalClass(
     return this.transform<F, Nothing?>(transformer, null)
 }
 
-class FirTypeResolveTransformer(
+open class FirTypeResolveTransformer(
     override val session: FirSession,
     scopeSession: ScopeSession,
     initialScopes: List<FirScope> = emptyList()
@@ -51,7 +51,7 @@ class FirTypeResolveTransformer(
     }
 
     private val typeResolverTransformer: FirSpecificTypeResolverTransformer = FirSpecificTypeResolverTransformer(session)
-    private var currentFile: FirFile? = null
+    protected var currentFile: FirFile? = null
 
     override fun transformFile(file: FirFile, data: Any?): FirFile {
         checkSessionConsistency(file)

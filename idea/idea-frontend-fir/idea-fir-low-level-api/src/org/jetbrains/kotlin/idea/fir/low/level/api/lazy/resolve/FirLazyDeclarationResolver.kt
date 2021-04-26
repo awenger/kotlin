@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.fir.resolve.ResolutionMode
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.resolve.providers.FirProvider
 import org.jetbrains.kotlin.fir.resolve.symbolProvider
+import org.jetbrains.kotlin.fir.resolve.transformers.FirSupertypeResolverTransformer
 import org.jetbrains.kotlin.idea.fir.low.level.api.api.collectDesignation
 import org.jetbrains.kotlin.idea.fir.low.level.api.element.builder.FirTowerDataContextCollector
 import org.jetbrains.kotlin.idea.fir.low.level.api.element.builder.getNonLocalContainingOrThisDeclaration
@@ -116,9 +117,10 @@ internal class FirLazyDeclarationResolver(
         toPhase: FirResolvePhase,
         towerDataContextCollector: FirTowerDataContextCollector? = null,
         checkPCE: Boolean,
+        lastNonLazyPhase: FirResolvePhase = LAST_NON_LAZY_PHASE
     ) {
         if (fromPhase >= toPhase) return
-        val nonLazyPhase = minOf(toPhase, LAST_NON_LAZY_PHASE)
+        val nonLazyPhase = minOf(toPhase, lastNonLazyPhase)
 
         val scopeSession = ScopeSession()
         if (fromPhase < nonLazyPhase) {
@@ -147,6 +149,7 @@ internal class FirLazyDeclarationResolver(
             if (currentPhase.pluginPhase) continue
             if (checkPCE) checkCanceled()
             runLazyResolvePhase(
+                firDeclarationToResolve,
                 containerFirFile,
                 currentPhase,
                 scopeSession,
@@ -157,6 +160,7 @@ internal class FirLazyDeclarationResolver(
     }
 
     private fun runLazyResolvePhase(
+        firDeclarationToResolve: FirDeclaration,
         containerFirFile: FirFile,
         phase: FirResolvePhase,
         scopeSession: ScopeSession,
@@ -168,6 +172,7 @@ internal class FirLazyDeclarationResolver(
         }
 
         val transformer = phase.createLazyTransformer(
+            firDeclarationToResolve,
             designation,
             containerFirFile,
             scopeSession,
@@ -175,28 +180,48 @@ internal class FirLazyDeclarationResolver(
         )
 
         firFileBuilder.firPhaseRunner.runPhaseWithCustomResolve(phase) {
-            containerFirFile.transform<FirFile, ResolutionMode>(transformer, ResolutionMode.ContextDependent)
+            transformer.transformDesignatedDeclaration()
         }
     }
 
     private fun FirResolvePhase.createLazyTransformer(
+        firDeclarationToResolve: FirDeclaration,
         designation: List<FirDeclaration>,
         containerFirFile: FirFile,
         scopeSession: ScopeSession,
         towerDataContextCollector: FirTowerDataContextCollector?
-    ) = when (this) {
+    ): FirDesignatedResolveTransformerForIDE = when (this) {
+        FirResolvePhase.SEALED_CLASS_INHERITORS -> object : FirDesignatedResolveTransformerForIDE {
+            override fun transformDesignatedDeclaration() {}
+        }
+        FirResolvePhase.SUPER_TYPES -> FirDesignatedSupertypeResolverTransformerForIDE(
+            containerFirFile,
+            firDeclarationToResolve,
+            containerFirFile.session,
+            scopeSession
+        )
+        FirResolvePhase.TYPES -> FirDesignatedTypeResolverTransformerForIDE(
+            containerFirFile,
+            firDeclarationToResolve,
+            FirDesignation(designation),
+            containerFirFile.session,
+            scopeSession,
+        )
         FirResolvePhase.CONTRACTS -> FirDesignatedContractsResolveTransformerForIDE(
+            containerFirFile,
             FirDesignation(designation),
             containerFirFile.session,
             scopeSession,
         )
         FirResolvePhase.IMPLICIT_TYPES_BODY_RESOLVE -> FirDesignatedImplicitTypesTransformerForIDE(
+            containerFirFile,
             FirDesignation(designation),
             containerFirFile.session,
             scopeSession,
             towerDataContextCollector,
         )
         FirResolvePhase.BODY_RESOLVE -> FirDesignatedBodyResolveTransformerForIDE(
+            containerFirFile,
             FirDesignation(designation),
             containerFirFile.session,
             scopeSession,
