@@ -299,6 +299,14 @@ internal fun IrTypeMapper.mapClassSignature(irClass: IrClass, type: Type): JvmCl
 
     superInterfaces.addAll(kotlinMarkerInterfaces)
 
+    if (irClass.superTypes.any { it.isSuspendFunction() || it.isKSuspendFunction() }) {
+        sw.writeInterface()
+        sw.writeAsmType(Type.getObjectType("kotlin/coroutines/jvm/internal/SuspendFunction"))
+        sw.writeInterfaceEnd()
+
+        superInterfaces.add("kotlin/coroutines/jvm/internal/SuspendFunction")
+    }
+
     return JvmClassSignature(
         type.internalName, superClassAsmType.internalName,
         ArrayList(superInterfaces), sw.makeJavaGenericSignature()
