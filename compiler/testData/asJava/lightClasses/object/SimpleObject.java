@@ -17,6 +17,10 @@ public final class A /* pack.A*/ {
 
   private  A();//  .ctor()
 
+  private static final int c$lambda-0();//  c$lambda-0()
+
+  private static final java.lang.String v$lambda-1();//  v$lambda-1()
+
   public final int f();//  f()
 
   public final int getC();//  getC()

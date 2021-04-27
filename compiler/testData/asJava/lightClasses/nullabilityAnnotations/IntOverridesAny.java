@@ -7,6 +7,8 @@ public final class C /* C*/ implements Tr {
   @org.jetbrains.annotations.NotNull()
   public java.lang.Integer getV();//  getV()
 
+  private static final int v$lambda-0();//  v$lambda-0()
+
   public  C();//  .ctor()
 
 }
