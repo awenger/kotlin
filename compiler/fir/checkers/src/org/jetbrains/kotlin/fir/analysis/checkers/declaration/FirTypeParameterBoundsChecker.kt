@@ -5,14 +5,12 @@
 
 package org.jetbrains.kotlin.fir.analysis.checkers.declaration
 
-import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.fir.FirRealSourceElementKind
 import org.jetbrains.kotlin.fir.analysis.checkers.*
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
-import org.jetbrains.kotlin.fir.analysis.diagnostics.getAncestors
 import org.jetbrains.kotlin.fir.analysis.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.typeContext
@@ -43,7 +41,6 @@ object FirTypeParameterBoundsChecker : FirTypeParameterChecker() {
         checkBoundUniqueness(declaration, context, reporter)
         checkConflictingBounds(declaration, context, reporter)
         checkTypeAliasBound(declaration, containingDeclaration, context, reporter)
-        checkBoundsPlacement(declaration, context, reporter)
         checkDynamicBounds(declaration, context, reporter)
     }
 
@@ -105,14 +102,6 @@ object FirTypeParameterBoundsChecker : FirTypeParameterChecker() {
         }
     }
 
-    private fun FirTypeRef.isInTypeConstraint(): Boolean {
-        val source = source ?: return false
-        return source.treeStructure.getAncestors(source.lighterASTNode)
-            .find { it.tokenType == KtNodeTypes.TYPE_CONSTRAINT || it.tokenType == KtNodeTypes.TYPE_PARAMETER }
-            ?.tokenType == KtNodeTypes.TYPE_CONSTRAINT
-    }
-
-
     private fun checkBoundUniqueness(declaration: FirTypeParameter, context: CheckerContext, reporter: DiagnosticReporter) {
         val seenClasses = mutableSetOf<FirRegularClass>()
         val allNonErrorBounds = declaration.bounds.filter { it !is FirErrorTypeRef }
@@ -149,16 +138,6 @@ object FirTypeParameterBoundsChecker : FirTypeParameterChecker() {
 
         if (anyConflictingTypes(declaration.bounds.map { it.coneType })) {
             reporter.reportOn(declaration.source, FirErrors.CONFLICTING_UPPER_BOUNDS, declaration.symbol, context)
-        }
-    }
-
-    //TODO should be moved to extended checkers (because this is basically a code-style warning)
-    private fun checkBoundsPlacement(declaration: FirTypeParameter, context: CheckerContext, reporter: DiagnosticReporter) {
-        if (declaration.bounds.size < 2) return
-
-        val (constraint, params) = declaration.bounds.partition { it.isInTypeConstraint() }
-        if (params.isNotEmpty() && constraint.isNotEmpty()) {
-            reporter.reportOn(declaration.source, FirErrors.MISPLACED_TYPE_PARAMETER_CONSTRAINTS, context)
         }
     }
 
