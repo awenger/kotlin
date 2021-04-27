@@ -21,9 +21,10 @@ fun test() {
 }
 
 // JVM_TEMPLATES
-// 3 GETSTATIC ConstClosureOptimizationKt\$test\$1\.INSTANCE
-// 1 GETSTATIC ConstClosureOptimizationKt\$test\$2\.INSTANCE
-// 1 GETSTATIC ConstClosureOptimizationKt\$test\$3\.INSTANCE
+// 1 GETSTATIC ConstClosureOptimizationKt\$test\$1\.INSTANCE
+// 3 GETSTATIC ConstClosureOptimizationKt\$test\$1\$1\.INSTANCE
+// 1 GETSTATIC ConstClosureOptimizationKt\$test\$1\$lam\$1\.INSTANCE
+// 1 GETSTATIC ConstClosureOptimizationKt\$test\$1\$cr\$1\.INSTANCE
 
 // JVM_IR_TEMPLATES
 // 1 GETSTATIC ConstClosureOptimizationKt\$test\$cr\$1.INSTANCE
