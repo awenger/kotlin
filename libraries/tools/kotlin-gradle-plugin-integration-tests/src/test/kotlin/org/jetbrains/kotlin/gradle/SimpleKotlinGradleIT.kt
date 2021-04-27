@@ -179,4 +179,21 @@ class SimpleKotlinGradleIT : KGPBaseTest() {
             }
         }
     }
+
+    @GradleTest
+    @DisplayName("Should not produce kotlin-stdlib version conflict on Kotlin files compilation in 'buildSrc' module")
+    internal fun testKotlinDslStdlibVersionConflict(gradleVersion: GradleVersion) {
+        project(
+            projectName = "buildSrcUsingKotlinCompilationAndKotlinPlugin",
+            gradleVersion,
+            forceOutput = true
+        ) {
+            build("tasks") {
+                assertOutputDoesNotContain(
+                    "w: Runtime JAR files in the classpath should have the same version. " +
+                            "These files were found in the classpath:"
+                )
+            }
+        }
+    }
 }
