@@ -26986,6 +26986,12 @@ public class FirBlackBoxCodegenTestGenerated extends AbstractFirBlackBoxCodegenT
             }
 
             @Test
+            @TestMetadata("booleanAsAny.kt")
+            public void testBooleanAsAny() throws Exception {
+                runTest("compiler/testData/codegen/box/operatorConventions/compareTo/booleanAsAny.kt");
+            }
+
+            @Test
             @TestMetadata("comparable.kt")
             public void testComparable() throws Exception {
                 runTest("compiler/testData/codegen/box/operatorConventions/compareTo/comparable.kt");

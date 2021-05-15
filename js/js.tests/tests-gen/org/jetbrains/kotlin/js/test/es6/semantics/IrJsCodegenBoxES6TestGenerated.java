@@ -18032,6 +18032,11 @@ public class IrJsCodegenBoxES6TestGenerated extends AbstractIrJsCodegenBoxES6Tes
                 runTest("compiler/testData/codegen/box/operatorConventions/compareTo/boolean.kt");
             }
 
+            @TestMetadata("booleanAsAny.kt")
+            public void testBooleanAsAny() throws Exception {
+                runTest("compiler/testData/codegen/box/operatorConventions/compareTo/booleanAsAny.kt");
+            }
+
             @TestMetadata("comparable.kt")
             public void testComparable() throws Exception {
                 runTest("compiler/testData/codegen/box/operatorConventions/compareTo/comparable.kt");
