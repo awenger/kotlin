@@ -275,6 +275,9 @@ public class AsmUtil {
     }
 
     public static Type comparisonOperandType(Type left, Type right) {
+        if (left == Type.BOOLEAN_TYPE && right == Type.BOOLEAN_TYPE) return Type.BOOLEAN_TYPE;
+        if (left == Type.BOOLEAN_TYPE || right == Type.BOOLEAN_TYPE)
+            throw new IllegalArgumentException("Boolean::compareTo only possible with Boolean");
         if (left == Type.DOUBLE_TYPE || right == Type.DOUBLE_TYPE) return Type.DOUBLE_TYPE;
         if (left == Type.FLOAT_TYPE || right == Type.FLOAT_TYPE) return Type.FLOAT_TYPE;
         if (left == Type.LONG_TYPE || right == Type.LONG_TYPE) return Type.LONG_TYPE;

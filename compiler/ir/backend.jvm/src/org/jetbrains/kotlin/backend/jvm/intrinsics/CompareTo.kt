@@ -49,6 +49,7 @@ object CompareTo : IntrinsicMethod() {
             Type.LONG_TYPE -> v.invokestatic(IrIntrinsicMethods.INTRINSICS_CLASS_NAME, "compare", "(JJ)I", false)
             Type.FLOAT_TYPE -> v.invokestatic("java/lang/Float", "compare", "(FF)I", false)
             Type.DOUBLE_TYPE -> v.invokestatic("java/lang/Double", "compare", "(DD)I", false)
+            Type.BOOLEAN_TYPE -> v.invokestatic("java/lang/Boolean", "compare", "(ZZ)I", false)
             else -> throw UnsupportedOperationException()
         }
     }
